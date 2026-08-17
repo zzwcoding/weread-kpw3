@@ -152,4 +152,32 @@ expect(values.api_key == "" and next(values.cookies) == nil
     and values.account.name == "",
     "account reset left credentials behind")
 
+-- Nested defaults must survive an empty or partial stored table.
+values.sync = {}
+local sync = settings:get("sync")
+expect(sync.pull_on_open == true and sync.upload_on_close == true
+    and sync.ask_on_conflict == true,
+    "empty stored sync did not fall back to the defaults")
+expect(next(values.sync) == nil,
+    "reading sync mutated the stored table")
+
+values.sync = { pull_on_open = false }
+sync = settings:get("sync")
+expect(sync.pull_on_open == false,
+    "explicit sync preference was not preserved")
+expect(sync.upload_on_close == true,
+    "missing sync sub-key did not fall back to the default")
+sync.upload_on_close = "mutated"
+expect(settings:get("sync").upload_on_close == true,
+    "get(sync) did not return a fresh table")
+
+values.read_report = {}
+expect(settings:get("read_report").enabled == true,
+    "empty stored read_report did not fall back to the defaults")
+
+values.startup = "broken"
+expect(settings:get("startup") == "broken",
+    "non-table stored value was mangled by the defaults merge")
+values.startup = nil
+
 print(("settings_spec: %d checks"):format(checks))

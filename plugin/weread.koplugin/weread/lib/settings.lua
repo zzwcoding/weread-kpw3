@@ -194,12 +194,30 @@ function Settings:new()
     return setmetatable(obj, self)
 end
 
+-- One-level merge of a stored table with its bundled defaults: stored values
+-- win, missing sub-keys fall back to the defaults. A stored empty table
+-- (e.g. sync = {}) must not shadow the defaults. Applies only when both
+-- sides are tables; defaults never nest deeper than one level.
+local function merge_defaults(stored, default)
+    if type(stored) ~= "table" or type(default) ~= "table" then
+        return stored
+    end
+    local merged = {}
+    for key, value in pairs(default) do
+        merged[key] = deepcopy(value)
+    end
+    for key, value in pairs(stored) do
+        merged[key] = value
+    end
+    return merged
+end
+
 function Settings:get(key, default)
     if default == nil then
         default = defaults[key]
     end
     if key ~= "books" then
-        return self.store:readSetting(key, deepcopy(default))
+        return merge_defaults(self.store:readSetting(key, deepcopy(default)), default)
     end
     local indexes = self.store:readSetting("books", {})
     local books = {}
