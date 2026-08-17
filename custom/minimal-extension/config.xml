@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension>
+	<information>
+		<name>Minimal</name>
+		<version>1.0</version>
+		<id>minimal</id>
+	</information>
+	<menus>
+		<menu type="json">menu.json</menu>
+	</menus>
+</extension>

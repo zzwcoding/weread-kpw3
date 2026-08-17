@@ -1,0 +1,10 @@
+{
+	"items": [
+	{
+		"name": "恢复开机直达 KOReader",
+		"action": "/mnt/us/extensions/kual-restore/restore-autostart.sh",
+		"exitmenu": false,
+		"status": false
+	}
+	]
+}

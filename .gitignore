@@ -1,0 +1,22 @@
+# 大文件/第三方安装包（文档里有获取方式，不进仓库）
+firmware/
+analysis/
+tools/
+deploy/kindle-root/
+deploy/*.zip
+deploy/*.tar.gz
+deploy/*.tar.xz
+deploy/*.bin
+deploy/languagebreak/
+deploy/peki/
+
+# 工作笔记与原始调试记录（救砖要点已提炼进 docs/04、05）
+notes/
+
+# 私人内容（不进公开仓库）
+custom/messages-src/
+custom/screensaver/
+
+# 系统垃圾
+.DS_Store
+*.bak

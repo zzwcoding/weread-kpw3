@@ -1,0 +1,549 @@
+ispeed=115200 ospeed=115200 (B115200=115200)
+
+
+U-Boot 2009.08-lab126 (Aug 01 2023 - 12:41:23)
+
+CPU: Freescale i.MX6 family TO0.0 at 996 MHz
+Temperature:   32 C, calibration data 0x5875065f
+mx6sl pll1: 996MHz
+mx6sl pll2: 528MHz
+mx6sl pll3: 480MHz
+mx6sl pll8: 50MHz
+ipg clock     : 66000000Hz
+ipg per clock : 24000000Hz
+uart clock    : 80000000Hz
+cspi clock    : 60000000Hz
+ahb clock     : 132000000Hz
+axi clock   : 198000000Hz
+emi_slow clock: 22000000Hz
+ddr clock     : 396000000Hz
+usdhc1 clock  : 198000000Hz
+usdhc2 clock  : 198000000Hz
+usdhc3 clock  : 198000000Hz
+usdhc4 clock  : 198000000Hz
+MMC:  FSL_ESDHC: 0,FSL_ESDHC: 1,FSL_ESDHC: 2
+Board: Muscat WFO
+Boot Reason: [ POR ]
+Boot Device: NAND
+Board Id: 0670XXXXXXXXXXXX
+S/N: G090XXXXXXXXXXXX
+I2C:   ready
+DRAM:  512 MB
+Using default environment
+
+In:    serial
+Out:   serial
+Err:   serial
+Quick Memory Test 0x80000000, 0x1fff0000
+POST done in 111 ms
+Battery voltage: 3935 mV
+
+Hit any key to stop autoboot:  1  0 
+## Booting kernel from Legacy Image at 80800000 ...
+   Image Name:   Linux-3.0.35-lab126
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3828980 Bytes =  3.7 MB
+   Load Address: 80008000
+   Entry Point:  80008000
+   Verifying Checksum ... OK
+   Loading Kernel Image ... OK
+OK
+
+Starting kernel ...
+
+[    0.096418] No Legacy reboot reason code to print
+[    0.279221] LPDDR2 MfgId: 0x3 [Elpida]
+[    0.282994] 
+[    0.282996] just text: vaddr c021effc, va 0xc021e200 pa 0x802000c3 attr 0x6
+[    0.291575] 
+[    0.291578] nmx6sl_wfi_iram: vaddr e084e000, va 0xe084e200 pa 0x904043 attr 0x2
+[    0.304611] 
+[    0.304615] mx6sl_ddr: vaddr e0856000, va 0xe0856200 pa 0x905043 attr 0x2
+[    0.312907] 
+[    0.312909] mx6sl_iomux: vaddr f40e0000, va 0xf40e0200 pa 0x20110c3 attr 0x149
+[    0.321656] 
+[    0.321658] ANATOP: vaddr f40c8000, va 0xf40c8200 pa 0x20110c3 attr 0x149
+[    0.329981] 
+[    0.329983] CCM: vaddr f40c4000, va 0xf40c4200 pa 0x20110c3 attr 0x149
+[    0.340126] 
+[    0.340128] MMDC_P0: vaddr f41b0000, va 0xf41b0200 pa 0x21110c3 attr 0x149
+[    0.353975] 
+[    0.353977] L2: vaddr f2a02000, va 0xf2a02200 pa 0xa02043 attr 0x149
+[    0.362977] 
+[    0.362980] arm perif: vaddr f2a00000, va 0xf2a00200 pa 0xa00043 attr 0x149
+[    0.376822] pmic_soda_connects_notify_otg_out:423
+3.0.35-lab126 #8 PREEMPT Tue Aug 1 12:49:59 UTC 2023 armv7l
+Press [ENTER] for recovery menu...       0 /BOOTING DEFAULT.
+IP-Config: no devices to configure
+kinit: Mounted root (ext3 filesystem) readonly.
+info sytem:mounted_proc::
+info system:mounted_sys::
+info system:sy00::
+info system:mounted_dev::
+info milestone:6.69:49.1:49.1
+info milestone:6.73:49.2:49.2
+info milestone:6.76:49.3:49.3
+info milestone:6.82:49.4:49.4
+info milestone:6.86:49.5:49.5
+info sytem:mounted_tmpfs::
+info milestone:6.93:sy50:sy50
+info system:start:time=6960:time=6960
+info hardware:no_wan:: WiFi only device. No WAN found
+info milestone:7.08:sy51:sy51
+lipc-send-event[835]: E lipc:con::Connection error(Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory)
+lipc-send-event[835]: C def:dbusi::Failed to init dbus
+lipc-send-event[835]: E def:open::Failed to open LIPC
+lipc-send-event[835]: E def:fail:source=com.lab126.hal, event=usbPlugIn:Sending event failed
+lipc-send-event[834]: E lipc:con::Connection error(Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory)
+lipc-send-event[834]: C def:dbusi::Failed to init dbus
+lipc-send-event[834]: E def:open::Failed to open LIPC
+lipc-send-event[834]: E def:fail:source=com.lab126.hal, event=usbPlugIn:Sending event failed
+info milestone:7.99:sy99:sy99
+info system:done:time=8020:time=8020
+crond[856]: crond (busybox 1.34.1) started, log level 8
+
+init.exe: recevent pre-start process (859) terminated with status 1
+
+
+
+Welcome to Kindle!
+
+kindle login: info milestone:8.28:sc01:sc01
+info system_fs_loopbacks:mountingfs:Mounting compressed directories filesystem images:Mounting compressed directories filesystem images
+info milestone:8.30:sc02:sc02
+info milestone:8.35:/usr/share/X11/xkb:/usr/share/X11/xkb
+info system_fs_loopbacks:mounted:Image /usr/share/X11/xkb.sqsh mounted:Image /usr/share/X11/xkb.sqsh mounted
+info milestone:8.40:3:3
+info milestone:8.41:sc05:sc05
+info milestone:8.43:/usr/java/lib/fonts:/usr/java/lib/fonts
+info system_fs_loopbacks:mounted:Image /usr/java/lib/fonts.sqsh mounted:Image /usr/java/lib/fonts.sqsh mounted
+info milestone:8.47:4:4
+info milestone:8.48:sc05:sc05
+info milestone:8.49:/etc/kdb.src:/etc/kdb.src
+info system_fs_loopbacks:mounted:Image /etc/kdb.src.sqsh mounted:Image /etc/kdb.src.sqsh mounted
+info milestone:8.53:5:5
+info milestone:8.54:sc05:sc05
+info milestone:8.55:/usr/lib/locale:/usr/lib/locale
+info system_fs_loopbacks:mounted:Image /usr/lib/locale.sqsh mounted:Image /usr/lib/locale.sqsh mounted
+info milestone:8.59:6:6
+info milestone:8.60:sc05:sc05
+info milestone:8.61:/usr/share/keyboard:/usr/share/keyboard
+info system_fs_loopbacks:mounted:Image /usr/share/keyboard.sqsh mounted:Image /usr/share/keyboard.sqsh mounted
+info milestone:8.74:7:7
+info milestone:8.74:sc05:sc05
+info milestone:8.76:/opt/var/local:/opt/var/local
+info system_fs_loopbacks:mounted:Image /opt/var/local.sqsh mounted:Image /opt/var/local.sqsh mounted
+info milestone:8.80:8:8
+info milestone:8.81:sc05:sc05
+info milestone:8.82:/etc/uks:/etc/uks
+info system_fs_loopbacks:mounted:Image /etc/uks.sqsh mounted:Image /etc/uks.sqsh mounted
+info milestone:8.87:9:9
+info milestone:8.88:sc05:sc05
+info milestone:8.88:sc07:sc07
+info system:emiting_event:mounted_fs_loopbacks:mounted_fs_loopbacks
+debug sytem:event_emitted:mounted_fs_loopbacks:mounted_fs_loopbacks
+info milestone:8.93:fs75:fs75
+info system:emiting_event:loaded_modules_dependencies:loaded_modules_dependencies
+debug sytem:event_emitted:loaded_modules_dependencies:loaded_modules_dependencies
+info modules:modprobe:loading module fsl_otg_arc:loading module fsl_otg_arc
+info system:emiting_event:loaded_fsl_otg_arc:loaded_fsl_otg_arc
+debug sytem:event_emitted:loaded_fsl_otg_arc:loaded_fsl_otg_arc
+info modules:modprobe:loading module ehci_hcd:loading module ehci_hcd
+info system:emiting_event:loaded_ehci_hcd:loaded_ehci_hcd
+debug sytem:event_emitted:loaded_ehci_hcd:loaded_ehci_hcd
+info modules:modprobe:loading module fuse:loading module fuse
+info system:emiting_event:loaded_fuse:loaded_fuse
+debug sytem:event_emitted:loaded_fuse:loaded_fuse
+info hardware:no_wan:: WiFi only device. No WAN found
+info system:emiting_event:loaded_ppp_async:loaded_ppp_async
+info milestone:9.21:fs00:fs00
+debug sytem:event_emitted:loaded_ppp_async:loaded_ppp_async
+info system:emiting_event:loaded_fakekey:loaded_fakekey
+info filesystems_keys:not applicable for this device type::
+debug sytem:event_emitted:loaded_fakekey:loaded_fakekey
+info filesystems_var_local:File system errors checked. Return code 0:Warning: skipping journal recovery because doing a read-only filesystem check.
+LocalVars: clean, 1361/16384 files, 31031/65536 blocks:Warning: skipping journal recovery because doing a read-only filesystem check.
+LocalVars: clean, 1361/16384 files, 31031/65536 blocks
+info filesystems_var_local:No file system errors::
+info filesystems_var_local:runfixup:Running /var/local/system/fixup:Running /var/local/system/fixup
+info jb_bridge:main:: i can fix this (r19309)
+info jb_bridge:mount_root_rw:: Mounting rootfs rw
+info jb_bridge:install_touch_update_key:: Copying the jailbreak updater key
+info jb_bridge:main:: these are not the droids you're looking for
+info filesystems_var_local:DB PARAMS:FreePageSize:0 bytes. AvailableSpaceInVarLocal:31229 KB.:FreePageSize:0 bytes. AvailableSpaceInVarLocal:31229 KB.
+info milestone:9.84:fs23:fs23
+info system:emiting_event:mounted_varLocal:mounted_varLocal
+debug sytem:event_emitted:mounted_varLocal:mounted_varLocal
+info milestone:9.96:vi00:vi00
+info filesystems_nh:createnh:mounting diags partition:mounting diags partition
+info prereg:PRAGMA_QUICK_CHECK_PASSED:: sts=0
+info system:emiting_event:mounted_nh:mounted_nh NH_REALLY_MOUNTED=1
+info display:update:Checking '/opt/eink/images/R098_ED060KD1C3' for overrides:Checking '/opt/eink/images/R098_ED060KD1C3' for overrides
+debug sytem:event_emitted:mounted_nh:mounted_nh NH_REALLY_MOUNTED=1
+info milestone:10.44:fs30:fs30
+info n_setup:n_setup started::
+info milestone:10.59:fs25:fs25
+info system:emiting_event:n_ready:n_ready
+debug sytem:event_emitted:n_ready:n_ready
+info n_setup:n_setup stopped::
+info userstore:run:time=10860,action=start:time=10860,action=start
+info userstore:start:found_bootup_flag:found_bootup_flag Found BOOTUP flag file
+err mntus:loopback_not_mounted:: loopback device is not set-up : losetup: /dev/loop/0: No such device or address
+info cyttsp4:update:cyttsp4 fw ver=000E file version=000E:cyttsp4 fw ver=000E file version=000E
+info system:emiting_event:loaded_touch:loaded_touch
+debug sytem:event_emitted:loaded_touch:loaded_touch
+info system:emiting_event:start_x:start_x
+debug sytem:event_emitted:start_x:start_x
+info milestone:12.55:vi99:vi99
+info display:started:time=12610:time=12610
+info system:emiting_event:display_ready:display_ready
+debug sytem:event_emitted:display_ready:display_ready
+info system:emiting_event:mounted_userstore:mounted_userstore
+debug sytem:event_emitted:mounted_userstore:mounted_userstore
+info milestone:12.80:fs50:fs50
+info milestone:12.91:fs90:fs90
+info filesystems_setup:Not create ENABLE_UNIFIED_STICKYNOTE_CX flag::
+info battery:charged:cap=69,mV=3940,mAH=1027:cap=69,mV=3940,mAH=1027
+info system:emiting_event:battery_ready:battery_ready
+info filesystems_setup:Create /app/bin/KPPMainApp to /app/bin/KPPMainAppV2::
+debug sytem:event_emitted:battery_ready:battery_ready
+info filesystems_setup:Update file absent or failed to backup::
+info milestone:13.14:fs99:fs99
+info milestone:13.17:sys99:sys99
+info system_setup:system_setup_after_shpm done::
+info system:emiting_event:dbus_ready:dbus_ready
+debug sytem:event_emitted:dbus_ready:dbus_ready
+info dbus:check-update:status=2:status=2 dbus_ready sent
+info perfd:starting...::
+
+
+U-Boot 2009.08-lab126 (Aug 01 2023 - 12:41:23)
+
+CPU: Freescale i.MX6 family TO0.0 at 996 MHz
+Temperature:   33 C, calibration data 0x5875065f
+mx6sl pll1: 996MHz
+mx6sl pll2: 528MHz
+mx6sl pll3: 480MHz
+mx6sl pll8: 50MHz
+ipg clock     : 66000000Hz
+ipg per clock : 24000000Hz
+uart clock    : 80000000Hz
+cspi clock    : 60000000Hz
+ahb clock     : 132000000Hz
+axi clock   : 198000000Hz
+emi_slow clock: 22000000Hz
+ddr clock     : 396000000Hz
+usdhc1 clock  : 198000000Hz
+usdhc2 clock  : 198000000Hz
+usdhc3 clock  : 198000000Hz
+usdhc4 clock  : 198000000Hz
+MMC:  FSL_ESDHC: 0,FSL_ESDHC: 1,FSL_ESDHC: 2
+Board: Muscat WFO
+Boot Reason: [ POR ]
+Boot Device: NAND
+Board Id: 0670XXXXXXXXXXXX
+S/N: G090XXXXXXXXXXXX
+I2C:   ready
+DRAM:  512 MB
+Using default environment
+
+In:    serial
+Out:   serial
+Err:   serial
+Quick Memory Test 0x80000000, 0x1fff0000
+POST done in 111 ms
+Battery voltage: 3933 mV
+
+Hit any key to stop autoboot:  1  0 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 
+uboot > 

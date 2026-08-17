@@ -1,0 +1,16 @@
+{
+	"items": [
+	{
+		"name": "执行极简定制（开机直达KOReader）",
+		"action": "/mnt/us/extensions/minimal/run-minimalize.sh",
+		"exitmenu": false,
+		"status": false
+	},
+	{
+		"name": "还原全部定制",
+		"action": "/mnt/us/extensions/minimal/run-restore.sh",
+		"exitmenu": false,
+		"status": false
+	}
+	]
+}
