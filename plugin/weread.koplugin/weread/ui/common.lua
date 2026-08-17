@@ -15,6 +15,13 @@ local unpack_args = PluginUtil.unpack_args
 
 local M = {}
 
+local function sleep_seconds(seconds)
+    local ok_socket, socket = pcall(require, "socket")
+    if ok_socket and socket.sleep then
+        socket.sleep(seconds)
+    end
+end
+
 function M:safeCallback(label, callback)
     return function(...)
         local args = { ... }
@@ -122,8 +129,16 @@ function M:showOffline(label)
 end
 
 function M:runOnlineTask(label, callback, delay)
+    -- KOReader's runWhenOnline fires on link state, which precedes usable
+    -- WAN/DNS by a few seconds. When the link is down (WiFi will be raised
+    -- for this task), let the connection settle before the first request.
+    local link_up = self:isNetworkConnected()
     local function task()
-        UIManager:scheduleIn(delay or 0.1, function()
+        local task_delay = delay or 0.1
+        if not link_up then
+            task_delay = math.max(task_delay, 1.5)
+        end
+        UIManager:scheduleIn(task_delay, function()
             local ok, err = xpcall(callback, debug.traceback)
             if not ok then
                 self:closeBusy()
@@ -170,6 +185,30 @@ function M:afterWifiAction()
     if not ok_after then
         logger.warn("after-wifi action failed:", log_error(err))
     end
+end
+
+-- Errors characteristic of the first seconds after WiFi was raised: socket
+-- not ready (wantread), timeouts, or no HTTP response at all. Deterministic
+-- HTTP failures (4xx) never match.
+function M:isEarlyConnectionError(err)
+    local text = tostring(err or ""):lower()
+    return text:find("timeout", 1, true) ~= nil
+        or text:find("wantread", 1, true) ~= nil
+        or text:find("http nil", 1, true) ~= nil
+        or text:find("request failed", 1, true) ~= nil
+        or text:find("no route", 1, true) ~= nil
+        or text:find("unreachable", 1, true) ~= nil
+end
+
+-- Run a blocking network call, retrying once after a short wait when the
+-- failure looks like a just-raised connection that is not usable yet.
+function M:callWithConnectionRetry(fn)
+    local ok, result = pcall(fn)
+    if not ok and self:isEarlyConnectionError(result) then
+        sleep_seconds(1.5)
+        ok, result = pcall(fn)
+    end
+    return ok, result
 end
 
 function M:runNetworkAction(label, action)

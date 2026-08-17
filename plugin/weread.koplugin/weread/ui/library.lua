@@ -116,7 +116,7 @@ function M:refreshBookshelf(old_view, view_options)
         -- Show the busy notice inside the task: when offline, runOnlineTask
         -- raises WiFi first and the task only runs once connected.
         self:showBusy(_("Loading bookshelf..."))
-        local ok, result = pcall(function()
+        local ok, result = self:callWithConnectionRetry(function()
             return self.client:get_shelf()
         end)
         if not ok then

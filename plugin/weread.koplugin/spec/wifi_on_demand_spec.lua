@@ -1,7 +1,8 @@
 -- WiFi-on-demand coverage: runOnlineTask defers to NetworkMgr:runWhenOnline
 -- when offline, afterWifiAction releases session-raised WiFi, the downloader
--- releases WiFi when the queue goes idle, and QR login releases it when the
--- login session ends.
+-- releases WiFi when the queue goes idle, QR login validates the login page
+-- strictly and retries transient early-connection failures without releasing
+-- WiFi, and the bookshelf refresh retries an early-connection failure once.
 
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
@@ -34,11 +35,13 @@ end
 package.preload["ui/network/manager"] = function() return network_mgr end
 
 local scheduled = {}
+local last_delay = nil
 local shown = {}
 package.preload["ui/uimanager"] = function()
     return {
-        scheduleIn = function(_self, _delay, callback)
+        scheduleIn = function(_self, delay, callback)
             scheduled[#scheduled + 1] = callback
+            last_delay = delay
         end,
         show = function(_self, widget) shown[#shown + 1] = widget end,
         close = function() end,
@@ -53,6 +56,7 @@ end
 package.preload["ui/bidi"] = function()
     return { dirpath = tostring }
 end
+package.preload["ui/widget/buttondialog"] = function() return {} end
 package.preload["ui/widget/confirmbox"] = function()
     return { new = function(_self, options) return options end }
 end
@@ -61,7 +65,9 @@ package.preload["ui/widget/infomessage"] = function()
 end
 package.preload["ui/widget/inputdialog"] = function() return {} end
 package.preload["ui/widget/menu"] = function() return {} end
+package.preload["ui/widget/progressbardialog"] = function() return {} end
 package.preload["ui/widget/qrmessage"] = function() return {} end
+package.preload["ui/widget/textviewer"] = function() return {} end
 package.preload["device"] = function()
     return {
         isKindle = function() return false end,
@@ -103,15 +109,33 @@ package.preload["weread.lib.plugin_util"] = function()
         log_error = tostring,
         display_error = tostring,
         unpack_args = function(args) return unpack(args) end,
+        file_exists = function() return false end,
     }
 end
 package.preload["weread.lib.i18n"] = function()
     return { tr = function(text) return text end }
 end
-package.preload["weread.lib.cookie"] = function() return {} end
-package.preload["weread.lib.protocol"] = function() return {} end
+package.preload["weread.lib.cookie"] = function()
+    return {
+        merge_set_cookie = function(cookies, set_cookie)
+            cookies = cookies or {}
+            cookies[#cookies + 1] = set_cookie
+            return cookies
+        end,
+        to_header = function(cookies)
+            return table.concat(cookies or {}, "; ")
+        end,
+    }
+end
+package.preload["weread.lib.protocol"] = function()
+    return { is_mp_book = function() return false end }
+end
 package.preload["weread.lib.content"] = function() return {} end
 package.preload["weread.lib.thoughts"] = function() return {} end
+package.preload["weread.lib.book_reviews"] = function()
+    return { format_date = function() return "" end }
+end
+package.preload["weread.ui.book_reviews_view"] = function() return {} end
 package.preload["weread.ui.download_dialog"] = function()
     return { new = function(_self, options) return options end }
 end
@@ -125,6 +149,7 @@ local ran = 0
 local accepted = host:runOnlineTask("Test", function() ran = ran + 1 end)
 expect(accepted == true, "online task was not accepted")
 expect(network_mgr.run_calls == 1, "runWhenOnline was not used")
+expect(last_delay == 0.1, "online task was delayed as if WiFi was raised")
 flush_scheduled()
 expect(ran == 1, "online task did not run")
 
@@ -139,6 +164,22 @@ network_mgr.deferred()
 flush_scheduled()
 expect(offline_ran == 1, "deferred task did not run after connecting")
 
+-- A task accepted while the link is down lets a just-raised connection
+-- settle before its first request.
+host.isNetworkConnected = function() return false end
+network_mgr.online = false
+expect(host:runOnlineTask("Settle", function() end) == true,
+    "settle task was not accepted")
+network_mgr.online = true
+network_mgr.deferred()
+expect(last_delay == 1.5,
+    "task on a just-raised link did not wait for WAN to settle")
+flush_scheduled()
+host.isNetworkConnected = nil
+for key, value in pairs(Common) do
+    if host[key] == nil then host[key] = value end
+end
+
 local before_after = network_mgr.after_calls
 host:afterWifiAction()
 expect(network_mgr.after_calls == before_after + 1,
@@ -148,6 +189,36 @@ expect(network_mgr.after_calls == before_after + 1,
 accepted = host:runOnlineTask("Boom", function() error("boom") end)
 flush_scheduled()
 expect(accepted == true, "failing task changed the accepted result")
+
+-- Part 1b: early-connection classifier and single retry helper.
+expect(host:isEarlyConnectionError("HTTP nil content_type=unknown"),
+    "HTTP nil was not classified as an early-connection error")
+expect(host:isEarlyConnectionError("socket: wantread"),
+    "wantread was not classified as an early-connection error")
+expect(host:isEarlyConnectionError("connection timeout"),
+    "timeout was not classified as an early-connection error")
+expect(not host:isEarlyConnectionError("HTTP 401 content_type=json"),
+    "HTTP 401 must not be classified as an early-connection error")
+expect(not host:isEarlyConnectionError("WeRead API key is not configured"),
+    "configuration errors must not be classified as early-connection errors")
+
+local retry_attempts = 0
+local retry_ok, retry_result = host:callWithConnectionRetry(function()
+    retry_attempts = retry_attempts + 1
+    if retry_attempts == 1 then error("wantread") end
+    return "shelf-data"
+end)
+expect(retry_ok == true and retry_result == "shelf-data" and retry_attempts == 2,
+    "early-connection failure was not retried once")
+local fail_attempts = 0
+local fail_ok, fail_err = host:callWithConnectionRetry(function()
+    fail_attempts = fail_attempts + 1
+    error("HTTP 401 content_type=json")
+end)
+expect(fail_ok == false and fail_attempts == 1,
+    "deterministic HTTP failure was retried")
+expect(tostring(fail_err):find("HTTP 401", 1, true) ~= nil,
+    "deterministic failure did not propagate the original error")
 
 -- Part 2: fallback when ui/network/manager is unavailable.
 package.loaded["ui/network/manager"] = nil
@@ -192,6 +263,7 @@ expect(wifi_released == 1,
 expect(downloader._scheduled_start ~= nil,
     "follow-up download was not scheduled")
 downloader._scheduled_start = nil
+scheduled = {} -- drop the captured follow-up start callback
 
 -- Without the callback the finish path stays silent.
 local plain = Downloader:new{}
@@ -200,7 +272,7 @@ plain._active_job = plain_job
 plain:_finishJob(plain_job)
 expect(plain._active_job == nil, "plain downloader job was not cleared")
 
--- Part 4: QR login releases WiFi when the session ends.
+-- Part 4: QR login strict begin validation, transient retries, WiFi release.
 local QRLogin = require("weread.lib.qr_login")
 local login_released = 0
 local login_infos = 0
@@ -225,23 +297,164 @@ local qr = QRLogin:new(login_host, {}, {})
 qr:cancel()
 expect(login_released == 0, "cancel without a session released WiFi")
 
+-- Transient begin failures retry without ending the session (WiFi stays up).
+qr._begin_protocol = function() error("no route to host") end
 qr:start()
 expect(#login_tasks == 1, "login did not schedule its first network task")
 expect(login_offline == 0,
     "login must defer connectivity to runOnlineTask instead of pre-checking")
-qr._begin_protocol = function() error("no route to host") end
-login_tasks[1].callback()
-expect(login_infos == 1, "login failure was not reported")
-expect(login_released == 1, "failed login session did not release WiFi")
+login_tasks[1].callback() -- attempt 1
+expect(login_released == 0 and login_infos == 0,
+    "first transient begin failure ended the login session")
+expect(#scheduled == 1, "transient begin failure did not schedule a retry")
+flush_scheduled() -- attempt 2
+expect(login_released == 0 and login_infos == 0,
+    "second transient begin failure ended the login session too early")
+expect(#scheduled == 1, "second begin failure did not schedule a final retry")
+flush_scheduled() -- attempt 3, exhausted
+expect(login_infos == 1, "exhausted begin retries did not report the failure")
+expect(login_released == 1, "exhausted begin retries did not release WiFi")
 expect(qr.started_at == nil, "failed login session was not reset")
 
+-- Cancelling while a retry is pending releases WiFi and disarms the retry.
+qr:start()
+login_tasks[#login_tasks].callback() -- attempt 1, retry pending
+expect(#scheduled == 1, "retried login did not schedule its retry")
+qr:cancel()
+expect(login_released == 2, "cancelling a retrying login did not release WiFi")
+flush_scheduled()
+expect(login_infos == 1, "stale begin retry ran after the login was cancelled")
+
+-- A deterministic begin failure (HTTP 4xx) does not retry.
+qr._begin_protocol = function()
+    error("Unable to open WeRead login page (HTTP 403)")
+end
+qr:start()
+login_tasks[#login_tasks].callback()
+expect(#scheduled == 0, "deterministic begin failure was retried")
+expect(login_infos == 2 and login_released == 3,
+    "deterministic begin failure did not fail the session immediately")
+
+-- Strict login page validation: a uid without cookies is a failed begin.
+local function make_login_client(page_headers, uid_data, uid_headers, uid_status)
+    return {
+        request_follow = function() return "page", 200, page_headers end,
+        request = function()
+            if uid_data == nil then
+                return nil, nil, uid_headers or {}, uid_status or "wantread"
+            end
+            return "json", 200, uid_headers or {}, "OK"
+        end,
+        decode_http_json = function() return uid_data end,
+    }
+end
+local qr_no_cookies = QRLogin:new(login_host,
+    make_login_client({}, { uid = "u1" }), {})
+local ok_no_cookies, no_cookies_err = pcall(function()
+    return qr_no_cookies:_begin_protocol()
+end)
+expect(ok_no_cookies == false
+    and tostring(no_cookies_err):find("no login cookies", 1, true) ~= nil,
+    "cookie-less login page was accepted")
+
+-- Transport failure on getLoginUid surfaces as a retryable error, not a Lua
+-- indexing error.
+local qr_transport = QRLogin:new(login_host,
+    make_login_client({ ["set-cookie"] = "wr_gid=1" }, nil), {})
+local ok_transport, transport_err = pcall(function()
+    return qr_transport:_begin_protocol()
+end)
+expect(ok_transport == false
+    and tostring(transport_err):find("wantread", 1, true) ~= nil,
+    "transport failure on getLoginUid was not reported as a request error")
+
+-- A valid page with cookies and a uid passes validation.
+local qr_good = QRLogin:new(login_host,
+    make_login_client({ ["set-cookie"] = "wr_gid=1" }, { uid = "u1" }), {})
+local ok_good, good_uid = pcall(function()
+    return qr_good:_begin_protocol()
+end)
+expect(ok_good and good_uid == "u1",
+    "valid login page did not produce a uid")
+
 -- Successful completion also ends the session.
-qr._complete_protocol = function() return { name = "Tester" } end
-qr.started_at = os.time()
-qr:_complete({ succeed = true }, qr.generation)
-expect(#login_tasks == 2, "login completion did not schedule its task")
-login_tasks[2].callback()
-expect(login_released == 2, "successful login did not release WiFi")
-expect(qr.started_at == nil, "successful login did not clear the session")
+qr_good._complete_protocol = function() return { name = "Tester" } end
+qr_good.started_at = os.time()
+qr_good:_complete({ succeed = true }, qr_good.generation)
+login_tasks[#login_tasks].callback()
+expect(login_released == 4, "successful login did not release WiFi")
+expect(qr_good.started_at == nil, "successful login did not clear the session")
+
+-- Part 5: bookshelf refresh retries an early-connection failure once.
+local shelf_view_data
+package.preload["weread.ui.library_view"] = function()
+    return {
+        show = function(data)
+            shelf_view_data = data
+            return { id = "shelf" }
+        end,
+    }
+end
+local Library = require("weread.ui.library")
+local shelf_infos = 0
+local shelf_host = {
+    settings = {
+        get = function(_self, key, default)
+            if key == "shelf" then return {} end
+            if key == "books" then return {} end
+            return default
+        end,
+        set = function() end,
+        flush = function() end,
+    },
+    library_db = nil,
+    requireLogin = function() return true end,
+    showBusy = function() end,
+    closeBusy = function() end,
+    showInfo = function() shelf_infos = shelf_infos + 1 end,
+    runOnlineTask = function(_self, _label, callback)
+        callback()
+        return true
+    end,
+    shelfSortSummary = function() return "" end,
+    shelfFilterSummary = function() return "" end,
+    bookMatchesFilters = function() return true end,
+    isBookDownloaded = function() return false end,
+}
+for key, value in pairs(Common) do
+    if shelf_host[key] == nil then shelf_host[key] = value end
+end
+for key, value in pairs(Library) do
+    if shelf_host[key] == nil then shelf_host[key] = value end
+end
+
+local shelf_attempts = 0
+shelf_host.client = {
+    get_shelf = function()
+        shelf_attempts = shelf_attempts + 1
+        if shelf_attempts == 1 then error("HTTP nil content_type=unknown") end
+        return { books = { { book_id = "b1", title = "Book" } } }
+    end,
+}
+shelf_host:refreshBookshelf()
+expect(shelf_attempts == 2,
+    "early-connection shelf failure was not retried")
+expect(shelf_infos == 0 and shelf_view_data ~= nil
+    and #shelf_view_data.books == 1,
+    "retried shelf refresh did not show the bookshelf")
+
+shelf_view_data = nil
+local shelf_fail_attempts = 0
+shelf_host.client = {
+    get_shelf = function()
+        shelf_fail_attempts = shelf_fail_attempts + 1
+        error("HTTP 401 content_type=json")
+    end,
+}
+shelf_host:refreshBookshelf()
+expect(shelf_fail_attempts == 1,
+    "deterministic shelf failure was retried")
+expect(shelf_infos == 1 and shelf_view_data == nil,
+    "deterministic shelf failure did not report the error")
 
 print(("wifi_on_demand_spec: %d checks"):format(checks))

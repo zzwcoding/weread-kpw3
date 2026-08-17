@@ -21,6 +21,11 @@ local API_KEY_URL = BASE_URL .. "/api/skills/apikeyGet?only_show=1"
 local LOGIN_SESSION_TIMEOUT_SECONDS = 300
 local POLL_BLOCK_TIMEOUT_SECONDS = 5
 local POLL_TOTAL_TIMEOUT_SECONDS = 8
+-- WiFi on demand raises the radio right before the login starts; the link
+-- being up does not mean WAN/DNS is usable yet, so the login page fetch
+-- retries transient failures before declaring the session failed.
+local BEGIN_MAX_ATTEMPTS = 3
+local BEGIN_RETRY_DELAY_SECONDS = 1.5
 
 local QRLogin = {}
 QRLogin.__index = QRLogin
@@ -69,6 +74,21 @@ local function is_timeout_error(err)
     local text = tostring(err or ""):lower()
     return text:find("timeout", 1, true) ~= nil
         or text:find("wantread", 1, true) ~= nil
+end
+
+-- Errors characteristic of the first seconds after WiFi was raised: no HTTP
+-- response at all, socket-level failures, or a login page that answered
+-- before the connection was really usable (no cookies). Deterministic HTTP
+-- failures (4xx) are not retryable.
+local function is_begin_retryable(err)
+    local text = tostring(err or ""):lower()
+    return is_timeout_error(err)
+        or text:find("http nil", 1, true) ~= nil
+        or text:find("http 5", 1, true) ~= nil
+        or text:find("request failed", 1, true) ~= nil
+        or text:find("no route", 1, true) ~= nil
+        or text:find("unreachable", 1, true) ~= nil
+        or text:find("no login cookies", 1, true) ~= nil
 end
 
 local function sleep_seconds(seconds)
@@ -152,14 +172,23 @@ function QRLogin:_begin_protocol()
         headers["Cookie"] = cookie_header
     end
 
-    local data, response_headers = self:_request_json(LOGIN_UID_URL, {
+    local data, response_headers, request_error = self:_request_json(LOGIN_UID_URL, {
         method = "GET",
         timeout = { 10, 20 },
         headers = headers,
     }, "getLoginUid")
+    if not data then
+        error("getLoginUid failed: " .. tostring(request_error or "request failed"))
+    end
     login_cookies = merge_response_cookies(login_cookies, response_headers)
     if type(data.uid) ~= "string" or data.uid == "" then
         error("WeRead did not return a valid login UID")
+    end
+    if Cookie.to_header(login_cookies) == "" then
+        -- The poll authenticates with these cookies; a uid issued without any
+        -- (observed when the request raced a just-raised WiFi link) always
+        -- fails polling with HTTP 401, so treat it as a failed begin.
+        error("WeRead login page returned no login cookies")
     end
 
     self.login_cookies = login_cookies
@@ -337,21 +366,49 @@ function QRLogin:start()
     -- pre-check here; the busy notice shows once the task actually runs.
     self.host:runOnlineTask(_("QR login"), function()
         self.host:showBusy(_("Getting login QR code..."))
-        local ok, uid_or_error = pcall(function()
-            return self:_begin_protocol()
-        end)
-        self.host:closeBusy()
-        if generation ~= self.generation then
-            return
-        end
-        if not ok then
-            logger.err("get login UID failed:", error_text(uid_or_error))
-            self:cancel()
-            self.host:showInfo(T(_("QR login failed:\n%1"), error_text(uid_or_error)))
-            return
-        end
-        self:_show_qr(uid_or_error, generation)
+        self:_begin_with_retry(generation, 1)
     end)
+end
+
+-- Fetch the login page/UID, retrying transient early-connection failures.
+-- WiFi raised for this session stays up across retries (nothing here calls
+-- cancel, which is what releases it); only success, a deterministic failure,
+-- or exhausting the attempts ends the session.
+function QRLogin:_begin_with_retry(generation, attempt)
+    local ok, uid_or_error = pcall(function()
+        return self:_begin_protocol()
+    end)
+    if generation ~= self.generation then
+        self.host:closeBusy()
+        return
+    end
+    if ok then
+        self.host:closeBusy()
+        self:_show_qr(uid_or_error, generation)
+        return
+    end
+    if attempt < BEGIN_MAX_ATTEMPTS and is_begin_retryable(uid_or_error) then
+        logger.warn("login page fetch not ready; retrying:",
+            tostring(attempt), error_text(uid_or_error))
+        UIManager:scheduleIn(BEGIN_RETRY_DELAY_SECONDS, function()
+            if generation ~= self.generation then
+                self.host:closeBusy()
+                return
+            end
+            self:_begin_with_retry(generation, attempt + 1)
+        end)
+        return
+    end
+    self.host:closeBusy()
+    logger.err("get login UID failed:", error_text(uid_or_error))
+    self:cancel()
+    if is_begin_retryable(uid_or_error) then
+        self.host:showInfo(T(
+            _("QR login failed:\n%1\n\nThe network may still be connecting. Please try again in a few seconds."),
+            error_text(uid_or_error)))
+    else
+        self.host:showInfo(T(_("QR login failed:\n%1"), error_text(uid_or_error)))
+    end
 end
 
 function QRLogin:_show_qr(uid, generation)
