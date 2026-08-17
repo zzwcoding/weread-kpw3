@@ -77,9 +77,9 @@ local function is_timeout_error(err)
 end
 
 -- Errors characteristic of the first seconds after WiFi was raised: no HTTP
--- response at all, socket-level failures, or a login page that answered
--- before the connection was really usable (no cookies). Deterministic HTTP
--- failures (4xx) are not retryable.
+-- response at all, socket-level failures, or a weak response that did not
+-- carry a real login UID (error/captive page). Deterministic HTTP failures
+-- (4xx) are not retryable.
 local function is_begin_retryable(err)
     local text = tostring(err or ""):lower()
     return is_timeout_error(err)
@@ -88,7 +88,8 @@ local function is_begin_retryable(err)
         or text:find("request failed", 1, true) ~= nil
         or text:find("no route", 1, true) ~= nil
         or text:find("unreachable", 1, true) ~= nil
-        or text:find("no login cookies", 1, true) ~= nil
+        or text:find("login uid", 1, true) ~= nil
+        or text:find("invalid json", 1, true) ~= nil
 end
 
 local function sleep_seconds(seconds)
@@ -184,11 +185,11 @@ function QRLogin:_begin_protocol()
     if type(data.uid) ~= "string" or data.uid == "" then
         error("WeRead did not return a valid login UID")
     end
-    if Cookie.to_header(login_cookies) == "" then
-        -- The poll authenticates with these cookies; a uid issued without any
-        -- (observed when the request raced a just-raised WiFi link) always
-        -- fails polling with HTTP 401, so treat it as a failed begin.
-        error("WeRead login page returned no login cookies")
+    -- The uid is a UUID issued by the 200 login response; anything else means
+    -- the JSON came from an error/captive page and must not reach the poll
+    -- stage (a garbage uid fails polling with HTTP 401).
+    if not data.uid:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
+        error("WeRead returned a malformed login UID")
     end
 
     self.login_cookies = login_cookies

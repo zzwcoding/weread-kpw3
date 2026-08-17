@@ -335,7 +335,8 @@ expect(#scheduled == 0, "deterministic begin failure was retried")
 expect(login_infos == 2 and login_released == 3,
     "deterministic begin failure did not fail the session immediately")
 
--- Strict login page validation: a uid without cookies is a failed begin.
+-- Login page validation: HTTP 200 + a UUID-shaped uid passes even when the
+-- page sets no cookies (the real WeRead login page never sets any).
 local function make_login_client(page_headers, uid_data, uid_headers, uid_status)
     return {
         request_follow = function() return "page", 200, page_headers end,
@@ -348,14 +349,25 @@ local function make_login_client(page_headers, uid_data, uid_headers, uid_status
         decode_http_json = function() return uid_data end,
     }
 end
+local VALID_UID = "5d124ff5-1234-4abc-8def-0123456789ab"
 local qr_no_cookies = QRLogin:new(login_host,
-    make_login_client({}, { uid = "u1" }), {})
-local ok_no_cookies, no_cookies_err = pcall(function()
+    make_login_client({}, { uid = VALID_UID }), {})
+local ok_no_cookies, no_cookies_uid = pcall(function()
     return qr_no_cookies:_begin_protocol()
 end)
-expect(ok_no_cookies == false
-    and tostring(no_cookies_err):find("no login cookies", 1, true) ~= nil,
-    "cookie-less login page was accepted")
+expect(ok_no_cookies and no_cookies_uid == VALID_UID,
+    "cookie-less login page with a valid uid was rejected")
+
+-- A uid that is not UUID-shaped must not reach the poll stage: it comes from
+-- an error/captive page and would fail polling with HTTP 401.
+local qr_bad_uid = QRLogin:new(login_host,
+    make_login_client({ ["set-cookie"] = "wr_gid=1" }, { uid = "u1" }), {})
+local ok_bad_uid, bad_uid_err = pcall(function()
+    return qr_bad_uid:_begin_protocol()
+end)
+expect(ok_bad_uid == false
+    and tostring(bad_uid_err):find("malformed login UID", 1, true) ~= nil,
+    "malformed login uid was accepted")
 
 -- Transport failure on getLoginUid surfaces as a retryable error, not a Lua
 -- indexing error.
@@ -370,11 +382,11 @@ expect(ok_transport == false
 
 -- A valid page with cookies and a uid passes validation.
 local qr_good = QRLogin:new(login_host,
-    make_login_client({ ["set-cookie"] = "wr_gid=1" }, { uid = "u1" }), {})
+    make_login_client({ ["set-cookie"] = "wr_gid=1" }, { uid = VALID_UID }), {})
 local ok_good, good_uid = pcall(function()
     return qr_good:_begin_protocol()
 end)
-expect(ok_good and good_uid == "u1",
+expect(ok_good and good_uid == VALID_UID,
     "valid login page did not produce a uid")
 
 -- Successful completion also ends the session.
