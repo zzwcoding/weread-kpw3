@@ -139,26 +139,6 @@ local order = {
         "advanced_settings",
         "developer_options",
     },
-    search = {
-        "search_settings",
-        "----------------------------",
-        "dictionary_lookup",
-        "dictionary_lookup_history",
-        "vocabbuilder",
-        "----------------------------",
-        "wikipedia_lookup",
-        "wikipedia_history",
-        "----------------------------",
-        "file_search",
-        "file_search_results",
-        "find_book_in_calibre_catalog",
-        "----------------------------",
-        "opds",
-    },
-    search_settings = {
-        "dictionary_settings",
-        "wikipedia_settings",
-    },
     main = {
         "history",
         "open_last_document",
@@ -200,6 +180,18 @@ local order = {
     -- 隐藏清单(从原属分组移除并列入此处)
     ["KOMenu:disabled"] = {
         "search",              -- ④ 搜索标签整组
+        "search_settings",
+        "dictionary_lookup",
+        "dictionary_lookup_history",
+        "vocabbuilder",
+        "wikipedia_lookup",
+        "wikipedia_history",
+        "file_search",
+        "file_search_results",
+        "find_book_in_calibre_catalog",
+        "opds",
+        "dictionary_settings",
+        "wikipedia_settings",
         "read_timer",          -- ③ 阅读计时器
         "calibre",             -- ③ Calibre
         "exporter",            -- ③ 导出笔记
