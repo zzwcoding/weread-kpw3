@@ -100,6 +100,7 @@ local function fixture(remote, options)
             callback()
             return true
         end,
+        run_silent = options.run_silent,
         upload_position = function(_book_id, position, elapsed)
             uploads[#uploads + 1] = position
             eq(elapsed, 0, "progress upload has zero reading time")
@@ -426,6 +427,170 @@ test("offline manual catalog refresh reports offline instead of raw reason", fun
     eq(refresh_count, 0, "offline path does not refresh")
     eq(#f.notifications, 1, "offline failure notifies once")
     eq(f.notifications[1].code, "offline", "offline message is explicit")
+end)
+
+test("offline auto pull without a silent runner still skips quietly", function()
+    local f = fixture({
+        bookId = "book",
+        progress = 25,
+        chapterUid = 22,
+        chapterIdx = 2,
+        chapterOffset = 150,
+        updateTime = 10,
+    }, {
+        is_online = function() return false end,
+    })
+    f.sync:on_reader_ready()
+    f.drain()
+    eq(f.sync:status().state, "offline", "offline open skips without runner")
+    eq(f.sync:status().verified, false, "offline open does not verify")
+    eq(#f.notifications, 0, "automatic offline path shows no UI")
+end)
+
+test("offline open pulls through the quiet background session", function()
+    local silent
+    local f = fixture({
+        bookId = "book",
+        progress = 25,
+        chapterUid = 22,
+        chapterIdx = 2,
+        chapterOffset = 150,
+        updateTime = 10,
+    }, {
+        is_online = function() return false end,
+        run_silent = function(task, on_drop)
+            silent = { task = task, on_drop = on_drop }
+            return true
+        end,
+    })
+    f.sync:on_reader_ready()
+    f.drain()
+    eq(silent ~= nil, true, "offline open queued a silent pull")
+    eq(f.sync:status().state, "pulling", "silent pull marked in flight")
+    eq(f.sync:status().verified, false, "pull deferred until connected")
+    silent.task()
+    f.drain()
+    eq(f.sync:status().verified, true, "silent pull verifies after connecting")
+    eq(#f.notifications, 0, "silent pull shows no UI")
+end)
+
+test("dropped silent pull resets in-flight state", function()
+    local silent
+    local f = fixture({
+        bookId = "book",
+        progress = 25,
+        chapterUid = 22,
+        chapterIdx = 2,
+        chapterOffset = 150,
+        updateTime = 10,
+    }, {
+        is_online = function() return false end,
+        run_silent = function(task, on_drop)
+            silent = { task = task, on_drop = on_drop }
+            return true
+        end,
+    })
+    f.sync:on_reader_ready()
+    f.drain()
+    silent.on_drop()
+    eq(f.sync:status().pulling, false, "dropped pull clears in-flight flag")
+    eq(f.sync:status().state, "offline", "dropped pull degrades to offline")
+end)
+
+test("offline close uploads silently and clears the pending snapshot", function()
+    local online = true
+    local silent
+    local f = fixture({
+        bookId = "book",
+        progress = 25,
+        chapterUid = 22,
+        chapterIdx = 2,
+        chapterOffset = 150,
+        updateTime = 10,
+    }, {
+        is_online = function() return online end,
+        run_silent = function(task, on_drop)
+            silent = { task = task, on_drop = on_drop }
+            return true
+        end,
+    })
+    f.sync:on_reader_ready()
+    f.drain()
+    f.document.page = 50
+    f.sync:on_page_update()
+    online = false
+    f.sync:on_close_document()
+    eq(#f.uploads, 0, "offline close did not upload inline")
+    eq(silent ~= nil, true, "offline close queued a silent upload")
+    eq(f.values.books.book.pending_upload_position ~= nil, true,
+        "pending snapshot persisted before the upload")
+    silent.task()
+    eq(#f.uploads, 1, "silent upload ran after connecting")
+    eq(f.uploads[1].percent, 50, "silent upload carries the current percent")
+    eq(f.values.books.book.pending_upload_position, nil,
+        "successful silent upload clears the pending snapshot")
+end)
+
+test("dropped silent upload keeps the pending snapshot", function()
+    local online = true
+    local silent
+    local f = fixture({
+        bookId = "book",
+        progress = 25,
+        chapterUid = 22,
+        chapterIdx = 2,
+        chapterOffset = 150,
+        updateTime = 10,
+    }, {
+        is_online = function() return online end,
+        run_silent = function(task, on_drop)
+            silent = { task = task, on_drop = on_drop }
+            return true
+        end,
+    })
+    f.sync:on_reader_ready()
+    f.drain()
+    f.document.page = 50
+    f.sync:on_page_update()
+    online = false
+    f.sync:on_suspend()
+    eq(silent ~= nil, true, "offline suspend queued a silent upload")
+    silent.on_drop()
+    eq(f.sync:status().uploading, false,
+        "dropped upload clears in-flight flag")
+    eq(f.values.books.book.pending_upload_position ~= nil, true,
+        "dropped upload keeps the pending snapshot for later")
+end)
+
+test("resume retries a persisted pending upload through the silent session", function()
+    local silent
+    local f = fixture({
+        bookId = "book",
+        progress = 25,
+        chapterUid = 22,
+        chapterIdx = 2,
+        chapterOffset = 150,
+        updateTime = 10,
+    }, {
+        is_online = function() return false end,
+        run_silent = function(task, on_drop)
+            silent = { task = task, on_drop = on_drop }
+            return true
+        end,
+    })
+    f.values.books.book.pending_upload_position = {
+        book_id = "book",
+        percent = 42,
+        chapter_uid = 22,
+    }
+    f.values.books.book.pending_upload_reason = "suspend"
+    f.sync:on_resume()
+    eq(silent ~= nil, true, "resume queued a silent retry for the pending upload")
+    silent.task()
+    eq(#f.uploads, 1, "resume retried the pending upload")
+    eq(f.uploads[1].percent, 42, "retry uploads the persisted snapshot")
+    eq(f.values.books.book.pending_upload_position, nil,
+        "resume retry clears the pending snapshot")
 end)
 
 print(string.format(

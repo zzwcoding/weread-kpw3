@@ -62,6 +62,11 @@ function ProgressSync:new(options)
         refresh_catalog = options.refresh_catalog,
         get_file_context = options.get_file_context,
         run_online = options.run_online,
+        -- Optional quiet background runner (silent_network): run_silent(task,
+        -- on_drop) raises WiFi without any UI, runs task once connected, and
+        -- releases WiFi afterwards. Automatic (non-manual) paths use it when
+        -- offline; without it they keep the old skip-when-offline behavior.
+        run_silent = options.run_silent,
         upload_position = options.upload_position,
         goto_fraction = options.goto_fraction,
         open_chapter = options.open_chapter,
@@ -342,11 +347,6 @@ function ProgressSync:_upload_snapshot(position, reason, show_result)
         pending_upload_position = position,
         pending_upload_reason = reason or "unspecified",
     })
-    if not self.is_online() then
-        self.state = "offline"
-        if show_result then self.notify("offline", {}) end
-        return false
-    end
     self.uploading = true
     self.state = "uploading"
     local attempts = 0
@@ -399,6 +399,22 @@ function ProgressSync:_upload_snapshot(position, reason, show_result)
                 error = tostring(error_message or "upload_failed"),
             })
         end
+    end
+    if not self.is_online() then
+        -- Automatic paths (close/suspend/resume) go through the quiet
+        -- background session: raise WiFi without UI, upload, release. The
+        -- pending snapshot above survives an interrupted session (e.g. the
+        -- device suspends first) and is retried on the next resume.
+        if not show_result and type(self.run_silent) == "function" then
+            return self.run_silent(attempt, function()
+                self.uploading = false
+                self.state = "offline"
+            end)
+        end
+        self.uploading = false
+        self.state = "offline"
+        if show_result then self.notify("offline", {}) end
+        return false
     end
     local started = self.run_online("progress_upload", attempt)
     if not started then
@@ -517,16 +533,8 @@ function ProgressSync:_pull(options)
         if options.manual then self.notify("authentication_required", {}) end
         return false
     end
-    if not self.is_online() then
-        self.state = "offline"
-        if options.manual then self.notify("offline", {}) end
-        return false
-    end
 
-    local generation = self.generation
-    self.pulling = true
-    self.state = "pulling"
-    local started = self.run_online("progress_pull", function()
+    local function pull_body(generation)
         if not local_position then
             local book_id = tostring(self.detect_book() or "")
             local refresh_ok, refreshed, refresh_error = pcall(
@@ -576,6 +584,33 @@ function ProgressSync:_pull(options)
             last_sync_error = false,
         })
         self:_resolve(local_position, remote, context, options)
+    end
+
+    if not self.is_online() then
+        -- Automatic pulls (open/resume) use the quiet background session:
+        -- raise WiFi without UI, pull, release. Manual sync keeps the
+        -- explicit offline notification.
+        if not options.manual and type(self.run_silent) == "function" then
+            local silent_generation = self.generation
+            self.pulling = true
+            self.state = "pulling"
+            return self.run_silent(function()
+                pull_body(silent_generation)
+            end, function()
+                self.pulling = false
+                self.state = "offline"
+            end)
+        end
+        self.state = "offline"
+        if options.manual then self.notify("offline", {}) end
+        return false
+    end
+
+    local generation = self.generation
+    self.pulling = true
+    self.state = "pulling"
+    local started = self.run_online("progress_pull", function()
+        pull_body(generation)
     end)
     if not started then
         self.pulling = false
@@ -662,6 +697,9 @@ function ProgressSync:on_reader_ready()
         end
         self.local_position = local_position
         self:_persist(book_id, { last_local_position = local_position })
+        -- A previous session may have left a persisted pending upload behind
+        -- (process kill, interrupted suspend); retry it quietly first.
+        self:_retry_pending_upload()
         if self:_config().pull_on_open ~= true then
             self.state = "unverified"
             return
@@ -717,11 +755,29 @@ end
 function ProgressSync:on_resume()
     local slept = self.suspended_at and self.now() - self.suspended_at or 0
     self.suspended_at = nil
+    -- A suspend may have interrupted the quiet upload; retry whatever is
+    -- still pending first (another silent session, no UI).
+    self:_retry_pending_upload()
     if slept >= RESUME_RECHECK_SECONDS
         and self:_config().pull_on_open == true then
         self:_clear_verified("resume_recheck")
         self:_pull({ manual = false })
     end
+end
+
+-- Re-upload a persisted pending snapshot for the current book. The snapshot
+-- survives process restarts and interrupted suspend uploads; when offline
+-- this goes through the quiet background session.
+function ProgressSync:_retry_pending_upload()
+    if self.uploading then return false end
+    local book_id = tostring(self.detect_book() or self.current_book_id or "")
+    if book_id == "" or is_mp_book(book_id) then return false end
+    local book = self.get_book(book_id)
+    if type(book) ~= "table" then return false end
+    local pending = book.pending_upload_position
+    if type(pending) ~= "table" then return false end
+    return self:_upload_snapshot(pending,
+        book.pending_upload_reason or "resume_retry", false)
 end
 
 function ProgressSync:sync_now()

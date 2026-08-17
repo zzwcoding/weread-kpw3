@@ -168,10 +168,40 @@ function M:onPageUpdate()
     self.progress_sync:on_page_update()
 end
 
+-- Queue a silent one-shot reading-time report. Book and position are
+-- captured eagerly because the flush runs after the document/progress state
+-- is torn down; the network work itself runs inside the quiet background
+-- WiFi session (sharing the progress upload's session when one is active)
+-- and never shows UI.
+function M:queueReadReportFlush(_reason)
+    local report = self.read_report
+    if not self.silent_network or type(report) ~= "table"
+        or type(report.flush_now) ~= "function" then
+        return false
+    end
+    local book_id = report.current_book_id
+    if not book_id and type(report.resolve_target) == "function" then
+        book_id = report:resolve_target()
+    end
+    if not book_id then return false end
+    local position
+    if type(report.position_provider) == "function" then
+        local provided, _, applies = report.position_provider(book_id)
+        if applies then
+            if not provided then return false end
+            position = provided
+        end
+    end
+    return self.silent_network:run(function()
+        report:flush_now(book_id, position)
+    end)
+end
+
 function M:onCloseDocument()
     -- Capture the immutable local position while the document is still alive.
     -- The network upload is scheduled; stopping ReadReport below also frees any
     -- in-flight report slot before that scheduled upload begins.
+    self:queueReadReportFlush("document_close")
     self.progress_sync:on_close_document()
     self._reader_session_gen = (self._reader_session_gen or 0) + 1
     self.downloader:cancelPrefetch("document_closed")
@@ -302,7 +332,11 @@ function M:stopReadReport(reason)
 end
 
 function M:onSuspend()
+    -- Silent background sync must not block or delay suspend: everything
+    -- queued here runs asynchronously and resumes after a wake if the device
+    -- suspends first.
     self.progress_sync:on_suspend()
+    self:queueReadReportFlush("suspend")
     self.read_report:on_suspend()
 end
 

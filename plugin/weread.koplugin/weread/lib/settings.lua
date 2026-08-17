@@ -23,8 +23,8 @@ local defaults = {
     books = {},
     downloads = {},
     sync = {
-        pull_on_open = false,
-        upload_on_close = false,
+        pull_on_open = true,
+        upload_on_close = true,
         ask_on_conflict = true,
         upload_interval_minutes = 0,
     },
@@ -48,7 +48,7 @@ local defaults = {
         max_size_mb = 1024,
     },
     read_report = {
-        enabled = false,
+        enabled = true,
         mode = "manual",
         book_id = "",
         book_title = "",

@@ -201,6 +201,121 @@ test("report context backfills SQLite from catalog.json", function()
     eq(written_catalog, disk_catalog, "catalog.json backfills SQLite")
 end)
 
+local function flush_fixture(options)
+    options = options or {}
+    local records = {}
+    local report
+    local books = {}
+    local settings = {
+        get = function(_self, key)
+            if key == "read_report" then
+                return {
+                    enabled = options.enabled ~= false,
+                    mode = "auto",
+                    interval_seconds = 30,
+                }
+            end
+            if key == "books" then
+                return books
+            end
+            return {}
+        end,
+        set = function(_self, key, value)
+            if key == "books" then books = value end
+        end,
+        flush = function() end,
+        is_cookie_configured = function()
+            return options.cookie_configured ~= false
+        end,
+    }
+    report = ReadReport:new{
+        settings = settings,
+        client = {
+            report_read = function(_self, payload)
+                records[#records + 1] = payload
+                return { succ = 1 }
+            end,
+        },
+        scheduler = {
+            scheduleIn = function() end,
+            unschedule = function() end,
+        },
+        get_document = function() return nil end,
+        detect_book = function() return nil end,
+        position_provider = options.position_provider,
+        -- Deliberately offline: flush_now must not consult the online gate.
+        is_online = function() return false end,
+        subprocess = false,
+        now = function() return 100 end,
+    }
+    books.book = {
+        book_id = "book",
+        psvts = "ps",
+        pclts = "pc",
+        chapter_uid = 11,
+        chapters = { { chapterUid = 11, chapterIdx = 1 } },
+        read_context_updated_at = 100,
+        read_session_id = report.session_id,
+        read_session_entered_at = 100,
+    }
+    return report, records
+end
+
+test("flush_now reports inline with the caller-captured position", function()
+    local report, records = flush_fixture()
+    local position = {
+        chapter_uid = 22,
+        chapter_idx = 2,
+        chapter_offset = 150,
+        percent = 25,
+    }
+    local ok = report:flush_now("book", position)
+    eq(ok, true, "flush accepted")
+    eq(#records, 1, "flush sent one report")
+    eq(records[1].kind, "report", "flush reports")
+    eq(records[1].chapter_uid, 22, "flush carries the captured chapter")
+    eq(records[1].chapter_offset, 150, "flush carries the captured offset")
+end)
+
+test("flush_now falls back to the position provider", function()
+    local live = { chapter_uid = 33, chapter_offset = 40, percent = 60 }
+    local report, records = flush_fixture({
+        position_provider = function() return live, nil, true end,
+    })
+    local ok = report:flush_now("book")
+    eq(ok == true and #records == 1 and records[1].chapter_uid == 33,
+        true, "flush used the provider position")
+end)
+
+test("flush_now stays quiet when gated or busy", function()
+    local report, records = flush_fixture({ enabled = false })
+    eq(report:flush_now("book") == false and #records == 0,
+        true, "disabled report does not flush")
+
+    local no_cookie, no_cookie_records = flush_fixture({
+        cookie_configured = false,
+    })
+    eq(no_cookie:flush_now("book") == false and #no_cookie_records == 0,
+        true, "missing cookie does not flush")
+
+    local gated, gated_records = flush_fixture({
+        position_provider = function()
+            return nil, "progress_unverified", true
+        end,
+    })
+    eq(gated:flush_now("book") == false and #gated_records == 0,
+        true, "unverified progress does not flush without a position")
+
+    local busy, busy_records = flush_fixture()
+    busy.job = { pid = 1 }
+    eq(busy:flush_now("book") == false and #busy_records == 0,
+        true, "in-flight report blocks the flush")
+
+    local empty, empty_records = flush_fixture()
+    eq(empty:flush_now(nil) == false and #empty_records == 0,
+        true, "missing book id does not flush")
+end)
+
 print(string.format(
     "read_report_progress_spec: %d checks, %d failure(s)", checks, failures))
 os.exit(failures == 0 and 0 or 1)

@@ -18,6 +18,7 @@ local ProgressSyncDialog = require("weread.ui.progress_sync_dialog")
 local QRLogin = require("weread.lib.qr_login")
 local ReadReport = require("weread.lib.read_report")
 local Settings = require("weread.lib.settings")
+local SilentNetwork = require("weread.lib.silent_network")
 local Updater = require("weread.lib.updater")
 local UpdaterUI = require("weread.ui.updater")
 
@@ -108,6 +109,33 @@ function WeReadPlugin:init()
         self.downloader:recover()
     end
     self.qr_login = QRLogin:new(self, self.client, self.settings)
+    -- Quiet on-demand WiFi for background sync (progress pull/upload, reading
+    -- time flush). enableWifi/disableWifi without the interactive flag never
+    -- show UI, unlike toggleWifiOn/runWhenOnline; ownership is tracked by
+    -- SilentNetwork so only self-raised WiFi is released.
+    self.silent_network = SilentNetwork:new{
+        scheduler = UIManager,
+        is_connected = function()
+            return self:isNetworkConnected()
+        end,
+        turn_wifi_on = function()
+            local ok, NetworkMgr = pcall(require, "ui/network/manager")
+            if not ok or not NetworkMgr
+                or type(NetworkMgr.enableWifi) ~= "function" then
+                return false
+            end
+            NetworkMgr:enableWifi(nil)
+            return true
+        end,
+        turn_wifi_off = function()
+            local ok, NetworkMgr = pcall(require, "ui/network/manager")
+            if not ok or not NetworkMgr
+                or type(NetworkMgr.disableWifi) ~= "function" then
+                return
+            end
+            NetworkMgr:disableWifi(nil)
+        end,
+    }
     self.read_report = ReadReport:new{
         settings = self.settings,
         client = self.client,
@@ -182,6 +210,9 @@ function WeReadPlugin:init()
         end,
         run_online = function(_kind, callback)
             return self:runOnlineTask(_("Sync progress"), callback)
+        end,
+        run_silent = function(task, on_drop)
+            return self.silent_network:run(task, on_drop)
         end,
         upload_position = function(book_id, position, elapsed_seconds)
             return self.read_report:upload_position(

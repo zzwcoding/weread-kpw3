@@ -910,6 +910,36 @@ function ReadReport:report_once()
     return self:_apply_outcome(outcome)
 end
 
+-- One-shot inline flush for close/suspend. Unlike report_once it skips the
+-- periodic-task gates (the task is being torn down) and the online check —
+-- the caller guarantees connectivity (typically the quiet background WiFi
+-- session). Blocking; failures are only logged via _apply_outcome. The
+-- position is passed in by the caller (captured while the document state is
+-- still alive) or taken from the provider when available, so the flush
+-- carries the latest progress.
+function ReadReport:flush_now(book_id, position)
+    book_id = tostring(book_id or self.current_book_id or "")
+    if book_id == "" then return false end
+    if not self:_config().enabled then return false end
+    if not self.settings:is_cookie_configured() then return false end
+    if self.job then
+        -- A report is already in flight; it carries fresher state anyway.
+        return false
+    end
+    if position == nil and type(self.position_provider) == "function" then
+        local provided, _, applies = self.position_provider(book_id)
+        if applies then
+            if not provided then return false end
+            position = provided
+        end
+    end
+    local outcome = self:_run_pipeline(book_id, {
+        allow_renewal = self:_renewal_allowed(),
+        position = position,
+    })
+    return self:_apply_outcome(outcome)
+end
+
 -- ------------------------------------------------------------------
 -- Report context
 -- ------------------------------------------------------------------
