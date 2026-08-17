@@ -32,7 +32,8 @@ JOBS="$JOBS otaupd otav3"
 # 遥测/日志收集（注意：demd 不能禁！lab126.conf 的启动条件是
 # "start on ... and started demd"，禁了 demd 会导致 lab126 及整个
 # 电源/USB/WiFi 守护层永不启动，开机卡死在树标画面）
-JOBS="$JOBS tmd iohwlogs printklogs last_debug_info"
+# phd：phone-home 心跳守护，WiFi 开着时每 30 秒向亚马逊发 UDP 心跳
+JOBS="$JOBS tmd iohwlogs printklogs last_debug_info phd"
 # 亚马逊后台推送/内容管理
 JOBS="$JOBS todo maruinstall wfmupdate wfmdelete wfm_forceupdate"
 # 工厂测试守护
