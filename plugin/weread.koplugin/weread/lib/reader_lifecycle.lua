@@ -65,7 +65,12 @@ function M:onWeReadSyncProgress()
     if not self:requireLogin(true, false) then
         return false
     end
-    self.progress_sync:sync_now()
+    -- Manual sync is a foreground action: runOnlineTask raises WiFi on demand
+    -- when offline. Periodic background ticks keep their own non-blocking
+    -- is_online gate and never reach this path.
+    self:runOnlineTask(_("Sync progress"), function()
+        self.progress_sync:sync_now()
+    end)
     return true
 end
 

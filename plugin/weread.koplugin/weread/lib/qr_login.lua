@@ -317,23 +317,26 @@ function QRLogin:_close_qr_dialog(programmatic)
 end
 
 function QRLogin:cancel()
+    local had_session = self.started_at ~= nil
     self.generation = self.generation + 1
     self.login_cookies = nil
     self.started_at = nil
     self:_close_qr_dialog(true)
+    -- A login session that got this far may have raised WiFi via
+    -- runOnlineTask; release it (no-op when WiFi was user-enabled).
+    if had_session and self.host.afterWifiAction then
+        self.host:afterWifiAction()
+    end
 end
 
 function QRLogin:start()
-    if not self.host:isNetworkOnline() then
-        self.host:showOffline(_("QR login"))
-        return
-    end
-
     self:cancel()
     local generation = self.generation
     self.started_at = os.time()
-    self.host:showBusy(_("Getting login QR code..."))
+    -- runOnlineTask raises WiFi on demand when offline, so no connectivity
+    -- pre-check here; the busy notice shows once the task actually runs.
     self.host:runOnlineTask(_("QR login"), function()
+        self.host:showBusy(_("Getting login QR code..."))
         local ok, uid_or_error = pcall(function()
             return self:_begin_protocol()
         end)
@@ -343,6 +346,7 @@ function QRLogin:start()
         end
         if not ok then
             logger.err("get login UID failed:", error_text(uid_or_error))
+            self:cancel()
             self.host:showInfo(T(_("QR login failed:\n%1"), error_text(uid_or_error)))
             return
         end
@@ -556,6 +560,11 @@ function QRLogin:_complete(login_result, generation)
             _("configured"),
             _("configured")
         ))
+        -- Login session done: release WiFi if this session raised it.
+        self.started_at = nil
+        if self.host.afterWifiAction then
+            self.host:afterWifiAction()
+        end
     end)
 end
 

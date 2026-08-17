@@ -61,6 +61,7 @@ end
 local Library = require("weread.ui.library")
 local books = {}
 local opened
+local wifi_released = 0
 local host = {
     settings = {
         get = function(_self, key, default)
@@ -71,6 +72,7 @@ local host = {
     ui = {
         openFile = function(_self, path) opened = path end,
     },
+    afterWifiAction = function() wifi_released = wifi_released + 1 end,
     getFullBookCachePath = function() return "/missing.epub" end,
     bookRecordHasDownload = function() return false end,
     safeCallback = function(_self, _label, callback) return callback end,
@@ -105,11 +107,15 @@ expect(host._chapter_list_view == nil
         and host._book_detail_view == nil
         and host.shelf_view == nil,
     "closed WeRead view references were retained")
+expect(wifi_released == 1,
+    "closing the bookshelf session did not release WiFi")
 
 closed = {}
 host.shelf_view = shelf_view
 host:openFile(nil)
 expect(#closed == 0 and host.shelf_view == shelf_view,
     "invalid open request unexpectedly closed the bookshelf")
+expect(wifi_released == 1,
+    "invalid open request unexpectedly released WiFi")
 
 print(("library_ui_cleanup_spec: %d checks"):format(checks))

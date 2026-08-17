@@ -98,6 +98,9 @@ function WeReadPlugin:init()
         is_connected = function()
             return self:isNetworkConnected()
         end,
+        after_wifi_action = function()
+            self:afterWifiAction()
+        end,
     }
     Migrations.run(self.settings, self.client)
     self.external_annotations_db:migrateLegacySettings()

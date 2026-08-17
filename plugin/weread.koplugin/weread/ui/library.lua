@@ -66,6 +66,8 @@ function M:showBookshelf()
     self:refreshBookshelf()
 end
 
+-- Close the bookshelf session's views and release WiFi if this session
+-- raised it (no-op when the user enabled WiFi manually).
 function M:closeWeReadUI()
     -- Close from the topmost view down so no full-screen WeRead widget remains
     -- in UIManager's window stack after a document is opened.
@@ -82,6 +84,7 @@ function M:closeWeReadUI()
             UIManager:close(view)
         end
     end
+    self:afterWifiAction()
 end
 
 function M:onWeReadAccountChanged()
@@ -109,8 +112,10 @@ end
 
 function M:refreshBookshelf(old_view, view_options)
     if not self:requireLogin(false, true) then return end
-    self:showBusy(_("Loading bookshelf..."))
     self:runOnlineTask(_("Bookshelf"), function()
+        -- Show the busy notice inside the task: when offline, runOnlineTask
+        -- raises WiFi first and the task only runs once connected.
+        self:showBusy(_("Loading bookshelf..."))
         local ok, result = pcall(function()
             return self.client:get_shelf()
         end)
@@ -201,6 +206,9 @@ function M:showShelfView(mode, keyword, old_view, options)
         end,
         on_refresh = function()
             self:refreshBookshelf(view, options)
+        end,
+        on_close = function()
+            self:afterWifiAction()
         end,
         on_sort = function()
             self:showShelfSortOptions(function()
@@ -393,13 +401,17 @@ function M:refreshBookRecord(book, old_view, options)
         return
     end
     local book_id = book.book_id or book.bookId
-    if not self:isNetworkOnline() then
-        if options.automatic then self:showBookMenu(book) end
+    -- Automatic refreshes must never raise WiFi; manual ones go through
+    -- runOnlineTask, which connects on demand when offline.
+    if options.automatic and not self:isNetworkOnline() then
+        self:showBookMenu(book)
         self:showOffline(_("Book info"))
         return
     end
-    self:showBusy(_("Loading book info..."))
     local started = self:runOnlineTask(_("Book info"), function()
+        -- Show the busy notice inside the task: when offline, runOnlineTask
+        -- raises WiFi first and the task only runs once connected.
+        self:showBusy(_("Loading book info..."))
         local ok, err = pcall(function()
             local info = self.client:get_book_info(book_id)
             if info then

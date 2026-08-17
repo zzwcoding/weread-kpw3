@@ -111,6 +111,7 @@ local LibraryView = FocusManager:extend{
     on_sort = nil,
     on_filter = nil,
     on_select = nil,
+    on_close = nil,
 }
 
 function LibraryView:tabBar()
@@ -328,6 +329,10 @@ end
 
 function LibraryView:onClose()
     UIManager:close(self)
+    -- User closed the bookshelf: end the network session (releases WiFi only
+    -- if this session raised it). Internal re-renders close the old view via
+    -- UIManager:close and never reach this handler.
+    if self.on_close then self.on_close() end
     return true
 end
 
@@ -349,6 +354,7 @@ function M.show(data, callbacks)
         on_sort = callbacks.on_sort,
         on_filter = callbacks.on_filter,
         on_select = callbacks.on_select,
+        on_close = callbacks.on_close,
     }
     UIManager:show(view)
     return view

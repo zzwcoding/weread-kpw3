@@ -58,6 +58,8 @@ Downloader.__index = Downloader
 --   refresh_ui(), refresh_shelf(),
 --   open_file(path), safe_callback(label, fn),
 --   require_login(cookie, api_key), run_online_task(label, fn),  -- host framework
+--   after_wifi_action(),          -- optional; called when the download queue
+--                                 -- becomes fully idle (WiFi-on-demand release)
 -- }
 function Downloader:new(o)
     o = o or {}
@@ -142,6 +144,13 @@ function Downloader:_finishJob(dl)
             self._scheduled_start = nil
             self:start(pending.book, pending.chapters, pending.suffix, pending.options)
         end)
+    end
+    -- WiFi on demand: the download session ends once the queue is fully idle
+    -- (no active job, no follow-up start scheduled). The callback releases
+    -- WiFi only if this session raised it; otherwise it is a no-op.
+    if not self._active_job and not self._scheduled_start
+        and type(self.after_wifi_action) == "function" then
+        self.after_wifi_action()
     end
 end
 

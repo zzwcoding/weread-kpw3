@@ -122,19 +122,54 @@ function M:showOffline(label)
 end
 
 function M:runOnlineTask(label, callback, delay)
+    local function task()
+        UIManager:scheduleIn(delay or 0.1, function()
+            local ok, err = xpcall(callback, debug.traceback)
+            if not ok then
+                self:closeBusy()
+                logger.err("network task failed:", label, log_error(err))
+                self:showInfo(T(_("%1 failed:\n%2"), label, display_error(err)))
+            end
+        end)
+    end
+    -- WiFi on demand: when offline, KOReader raises WiFi according to the
+    -- global wifi_enable_action setting ("turn_on" auto-connects with a
+    -- connecting notice, anything else falls back to a prompt) and runs the
+    -- task once connected. The task is accepted in every case, so report
+    -- success instead of the old offline failure.
+    local ok, NetworkMgr = pcall(require, "ui/network/manager")
+    if ok and NetworkMgr and type(NetworkMgr.runWhenOnline) == "function" then
+        local ok_run, run_err = pcall(function()
+            NetworkMgr:runWhenOnline(task)
+        end)
+        if ok_run then
+            return true
+        end
+        logger.warn("run-when-online failed:", label, log_error(run_err))
+    end
     if not self:isNetworkOnline() then
         self:showOffline(label)
         return false
     end
-    UIManager:scheduleIn(delay or 0.1, function()
-        local ok, err = xpcall(callback, debug.traceback)
-        if not ok then
-            self:closeBusy()
-            logger.err("network task failed:", label, log_error(err))
-            self:showInfo(T(_("%1 failed:\n%2"), label, display_error(err)))
-        end
-    end)
+    task()
     return true
+end
+
+-- End a foreground network session. KOReader only turns WiFi off when this
+-- session actually raised it via runWhenOnline and wifi_disable_action is
+-- "turn_off"; when the user enabled WiFi manually this is a no-op, so it is
+-- safe (and idempotent) to call at every session end.
+function M:afterWifiAction()
+    local ok, NetworkMgr = pcall(require, "ui/network/manager")
+    if not ok or not NetworkMgr or type(NetworkMgr.afterWifiAction) ~= "function" then
+        return
+    end
+    local ok_after, err = pcall(function()
+        NetworkMgr:afterWifiAction()
+    end)
+    if not ok_after then
+        logger.warn("after-wifi action failed:", log_error(err))
+    end
 end
 
 function M:runNetworkAction(label, action)
