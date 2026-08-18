@@ -27,7 +27,9 @@ rm -f /var/local/koreader_last_start /var/local/koreader_start_count
 # --- 1. 禁用的 upstart job 清单（改名 .conf → .conf.disabled） ---
 # 原生界面全家桶（独立于 framework，必须显式禁）
 # 注意：pillow 不能禁！它是屏保/休眠守护，禁了合盖和电源键都不休眠
-JOBS="kppmainapp kfxreader kfxview statusbar"
+# webreader：浏览器引擎，start on contentpack_font_ready（独立于 framework），
+# 无下游依赖，禁了省 ~18MB 内存
+JOBS="kppmainapp kfxreader kfxview statusbar webreader"
 # OTA 后台（保留 ota-update.conf 和 otaup，手动刷包仍可用）
 JOBS="$JOBS otaupd otav3"
 # 遥测/日志收集
