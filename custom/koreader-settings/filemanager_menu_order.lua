@@ -149,22 +149,7 @@ local order = {
         "----------------------------",
         "mass_storage_actions",
         "----------------------------",
-        "ota_update",
-        "help",
-        "----------------------------",
         "exit_menu",
-    },
-    help = {
-        "quickstart_guide",
-        "----------------------------",
-        "search_menu",
-        "----------------------------",
-        "report_bug",
-        "plugins_disable_external",
-        "----------------------------",
-        "system_statistics",
-        "version",
-        "about",
     },
     plus_menu = {},
     exit_menu = {
@@ -204,6 +189,16 @@ local order = {
         "text_editor",         -- ③ 文本编辑器
         "profiles",            -- ③ 配置方案
         "qrclipboard",         -- ③ QR剪贴板
+        -- ⑤ 主菜单: OTA更新 + 帮助整组(含全部成员, 防孤儿项)
+        "ota_update",
+        "help",
+        "quickstart_guide",
+        "search_menu",
+        "report_bug",
+        "plugins_disable_external",
+        "system_statistics",
+        "version",
+        "about",
     },
 }
 

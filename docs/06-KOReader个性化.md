@@ -1,6 +1,6 @@
 # 06 — KOReader 个性化定制
 
-三个自制插件 + 菜单定制 + 屏保定制。全部为 KOReader 标准机制，升级 KOReader 后只有一处核心文件改动需要重打（见文末）。
+三个自制插件 + 微信读书插件增强（WiFi 按需/静默同步）+ 菜单定制 + 屏保定制。除屏保消息框外全部为 KOReader 标准机制，升级 KOReader 后只有一处核心文件改动需要重打（见文末）。
 
 ## 插件总览
 
@@ -37,11 +37,36 @@ KOReader 插件默认启用，无需额外开启。SSH 入口：KOReader 齿轮�
 
 ## 菜单定制（隐藏无关菜单项）
 
-`custom/koreader-settings/filemanager_menu_order.lua` → 拷到 `/mnt/us/koreader/settings/`。
+两个编排文件（都在 `custom/koreader-settings/`），拷到 `/mnt/us/koreader/settings/`：
+
+- `filemanager_menu_order.lua`——文件管理器（书库）菜单：隐藏"搜索"整组标签、工具组 12 个无关项、主菜单的"OTA 更新"和"帮助"整组；
+- `reader_menu_order.lua`——阅读界面菜单：工具组只留"进度同步"，搜索组只留全文/书签搜索，主菜单藏"OTA 更新""帮助"。
 
 机制：MenuSorter 读取该文件作为完整编排；要隐藏的项从原分组移除并列入 `["KOMenu:disabled"]`；顶部标签整组隐藏 = 从 `KOMenu:menu_buttons` 移除该标签 id 并列入 disabled。
-本项目的选择：隐藏"搜索"整组标签 + 工具组里 12 个无关项（保留"更多工具"）。
-**只改子项不动分组结构的话，其余分组必须原样保留**，否则未引用的项会以"NEW:"前缀变成孤儿项显示出来。
+**两条铁律**（都是踩出来的，见 docs/05 第 16 条）：
+1. 只改子项不动分组结构的话，其余分组必须原样保留，否则未引用的项会以"NEW:"前缀变成孤儿项显示出来；
+2. **整组删除一个分组时，该组成员必须全部列入 disabled，且要收编所有 `sorting_hint` 指向该组的运行时注册项**（插件注册时会声明挂靠分组，如 `sorting_hint = "more_tools"`；组没了而项还在 → 菜单构建直接崩溃闪退）。注意 hint 的写法可能有变体（如 `sorting_hint = ("more_tools")`），grep 时用宽松模式 `sorting_hint[^,}]*` 全量排查。
+
+## 微信读书插件：WiFi 按需连接 + 静默后台同步
+
+插件在 `plugin/weread.koplugin`（kpw3-enhance 分支），两项网络行为改造：
+
+**前台动作按需联网**（书架刷新/登录/下载/手动同步）：
+- 全部经 `NetworkMgr:runWhenOnline` 收口，配合全局设置 `wifi_enable_action="turn_on"`（离线自动开 WiFi 并显示连接中）；
+- 会话结束（关书架/下载完成/登录结束）调 `NetworkMgr:afterWifiAction`，配合 `wifi_disable_action="turn_off"` 自动关 WiFi；
+- 归属语义：只关自己拉起的 WiFi，用户手动开的不会被误关。
+
+**自动同步静默联网**（打开书拉进度/关书合盖传进度+阅读时长）：
+- 自制 `silent_network.lua`：无 UI 后台拉起 WiFi（`NetworkMgr:enableWifi(nil)`，绕开带提示的高层封装），链路就绪后做**真实 WAN 探测**（TCP 连接 weread 网关，1.5s×3 次重试）再发请求——链路 up ≠ 路由可用，见 docs/05 第 17 条；
+- 失败/超时静默放弃，进度持久化为 pending，唤醒后自动补传；全程零 UI、不阻塞熄屏；
+- 后台周期 tick（进度/时长）仍只做非阻塞链路检查，离线静默跳过，绝不主动拉 WiFi。
+
+设备侧配套设置（settings.reader.lua / 插件设置）：
+```lua
+["wifi_enable_action"] = "turn_on",
+["wifi_disable_action"] = "turn_off",
+-- 插件 weread.lua: sync.pull_on_open=true, upload_on_close=true, read_report.enabled=true
+```
 
 ## 屏保定制（白底图片 + 花边消息框 + 爱心图标）
 
