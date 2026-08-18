@@ -18,11 +18,15 @@ local M = {}
 -- Kindles: AUTOSTART_KOREADER makes the KOReader upstart job start at boot,
 -- DONT_START_FRAMEWORK keeps the stock Java framework down. Removing both and
 -- rebooting returns the device to the stock system.
+-- [custom] 该菜单项已隐藏（极简定制后直接回原生会得到残缺系统），
+-- 以下常量与函数随之停用，保留备日后恢复。
+-- luacheck: ignore
 local STOCK_SWITCH_FILES = {
     "/mnt/us/AUTOSTART_KOREADER",
     "/mnt/us/DONT_START_FRAMEWORK",
 }
 
+-- luacheck: ignore
 local function stock_switch_files_exist()
     local ok, lfs = pcall(require, "libs/libkoreader-lfs")
     if not ok or not lfs then return false end
@@ -490,6 +494,10 @@ function M:getSettingsMenuItems()
                                 end
                             end),
                     },
+                    -- [custom] 隐藏"重启进入原生系统"：极简定制后原生主页(kppmainapp)
+                    -- 已禁用，直接回原生会得到残缺系统且无法再从KUAL恢复，有困死风险。
+                    -- 回原生请走 restore.sh（完整恢复）。保留代码备日后改回。
+                    --[[
                     {
                         text = _("Restart into the stock system"),
                         enabled_func = function()
@@ -518,6 +526,7 @@ function M:getSettingsMenuItems()
                             })
                         end),
                     },
+                    ]]
                 }
             end,
         },
