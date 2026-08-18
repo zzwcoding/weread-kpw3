@@ -16,15 +16,24 @@ SilentNetwork.__index = SilentNetwork
 
 local CONNECT_TIMEOUT_SECONDS = 10
 local POLL_INTERVAL_SECONDS = 0.5
--- The link being up does not mean WAN/DNS is usable yet; give the
--- connection a moment before the first request (same lesson as QR login).
+-- The link being up does not mean WAN/DNS is usable yet; without a probe,
+-- give the connection a moment before the first request (same lesson as QR
+-- login). With a probe, a real connectivity confirmation replaces the wait.
 local SETTLE_SECONDS = 1.0
+-- On Kindle the link can report ready seconds before the default route
+-- works (requests fail with EHOSTUNREACH). Probe real WAN usability up to
+-- three times, 1.5s apart (~8s window at most), before running any task.
+local PROBE_MAX_ATTEMPTS = 3
+local PROBE_INTERVAL_SECONDS = 1.5
 
 -- options = {
 --   scheduler,          -- UIManager-compatible scheduleIn
 --   is_connected(),     -- non-blocking link-state check
 --   turn_wifi_on(),     -- quiet WiFi raise; return false when unavailable
 --   turn_wifi_off(),    -- quiet WiFi release
+--   probe(),            -- optional real WAN check (e.g. TCP connect to the
+--                       -- target host with a short timeout); may block for
+--                       -- ~1s, runs only inside scheduled callbacks
 --   connect_timeout,    -- optional seconds, default 10
 -- }
 function SilentNetwork:new(options)
@@ -38,6 +47,7 @@ function SilentNetwork:new(options)
         is_connected = options.is_connected,
         turn_wifi_on = options.turn_wifi_on,
         turn_wifi_off = options.turn_wifi_off,
+        probe = options.probe,
         connect_timeout = tonumber(options.connect_timeout)
             or CONNECT_TIMEOUT_SECONDS,
         generation = 0,
@@ -95,14 +105,43 @@ function SilentNetwork:_drain(generation)
     self:_release()
 end
 
+-- Confirm real WAN usability before running any task. Without a probe the
+-- session falls back to a fixed settle delay; with one, passing the probe
+-- replaces the wait entirely. Retries stay under ~8 seconds and never run
+-- inside the suspend/close handlers themselves (only scheduled callbacks).
+function SilentNetwork:_probe(generation, attempt)
+    if generation ~= self.generation or not self.active then return end
+    if type(self.probe) ~= "function" then
+        self.scheduler:scheduleIn(SETTLE_SECONDS, function()
+            self:_drain(generation)
+        end)
+        return
+    end
+    local ok, ready = pcall(self.probe)
+    if ok and ready == true then
+        logger.info("silent session WAN ready:",
+            "probe_attempt=", tostring(attempt))
+        self:_drain(generation)
+        return
+    end
+    if not ok then
+        logger.warn("silent WAN probe failed:", tostring(ready))
+    end
+    if attempt >= PROBE_MAX_ATTEMPTS then
+        self:_abort("wan_probe_timeout")
+        return
+    end
+    self.scheduler:scheduleIn(PROBE_INTERVAL_SECONDS, function()
+        self:_probe(generation, attempt + 1)
+    end)
+end
+
 function SilentNetwork:_poll(generation, attempt)
     if generation ~= self.generation or not self.active then return end
     if self.is_connected() then
         logger.info("silent session connected:",
             "waited=", string.format("%.1f", attempt * POLL_INTERVAL_SECONDS))
-        self.scheduler:scheduleIn(SETTLE_SECONDS, function()
-            self:_drain(generation)
-        end)
+        self:_probe(generation, 1)
         return
     end
     if attempt * POLL_INTERVAL_SECONDS >= self.connect_timeout then
@@ -130,7 +169,7 @@ function SilentNetwork:run(task, on_drop)
     local generation = self.generation
     if self.is_connected() then
         self.scheduler:scheduleIn(0.1, function()
-            self:_drain(generation)
+            self:_probe(generation, 1)
         end)
         return true
     end

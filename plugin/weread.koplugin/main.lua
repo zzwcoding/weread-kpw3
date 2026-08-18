@@ -135,6 +135,20 @@ function WeReadPlugin:init()
             end
             NetworkMgr:disableWifi(nil)
         end,
+        probe = function()
+            -- Real WAN confirmation: on Kindle the link reports ready seconds
+            -- before the default route works (EHOSTUNREACH), so check with a
+            -- bare TCP connect to the WeRead gateway before syncing. Runs
+            -- only inside SilentNetwork's scheduled callbacks, never in the
+            -- suspend/close handlers.
+            local ok_socket, socket = pcall(require, "socket")
+            if not ok_socket or not socket.tcp then return true end
+            local conn = socket.tcp()
+            conn:settimeout(1.5)
+            local ok = conn:connect("i.weread.qq.com", 443)
+            conn:close()
+            return ok == 1
+        end,
     }
     self.read_report = ReadReport:new{
         settings = self.settings,

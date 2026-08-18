@@ -19,7 +19,7 @@ package.preload["weread.lib.logger"] = function() return fake_logger end
 
 local SilentNetwork = require("weread.lib.silent_network")
 
-local function fixture(connected)
+local function fixture(connected, probe)
     local state = {
         connected = connected == true,
         on_calls = 0,
@@ -41,6 +41,7 @@ local function fixture(connected)
         turn_wifi_off = function()
             state.off_calls = state.off_calls + 1
         end,
+        probe = probe,
         connect_timeout = 2,
     }
     local function step()
@@ -146,6 +147,58 @@ do
     while step() do end
     expect(ran == 0, "stale session callbacks ran after cancel")
     drain()
+end
+
+-- WAN probe: link up but route not working yet (EHOSTUNREACH) — the task
+-- waits for real connectivity, retried probes succeed on the third attempt.
+do
+    local probe_calls = 0
+    local state, net, drain = fixture(false, function()
+        probe_calls = probe_calls + 1
+        return probe_calls >= 3
+    end)
+    local ran = 0
+    net:run(function() ran = ran + 1 end)
+    state.connected = true
+    drain()
+    expect(probe_calls == 3, "WAN probe did not retry until ready")
+    expect(ran == 1, "task did not run after the probe passed")
+    expect(state.on_calls == 1 and state.off_calls == 1,
+        "probed session did not raise/release WiFi exactly once")
+end
+
+-- WAN never becomes usable: the task never runs, on_drop fires, own WiFi is
+-- released, no residue.
+do
+    local probe_calls = 0
+    local state, net, drain = fixture(false, function()
+        probe_calls = probe_calls + 1
+        return false
+    end)
+    local ran = 0
+    local dropped = 0
+    net:run(function() ran = ran + 1 end, function() dropped = dropped + 1 end)
+    state.connected = true
+    drain()
+    expect(probe_calls == 3, "WAN probe did not exhaust its budget")
+    expect(ran == 0, "task ran without a usable WAN")
+    expect(dropped == 1, "probe-starved task was not dropped through on_drop")
+    expect(state.off_calls == 1, "probe-starved session did not release WiFi")
+    expect(net.active == false and net.tasks == nil,
+        "probe-starved session left residue behind")
+end
+
+-- A throwing probe counts as "not ready" and never crashes the session.
+do
+    local state, net, drain = fixture(true, function()
+        error("probe boom")
+    end)
+    local dropped = 0
+    net:run(function() end, function() dropped = dropped + 1 end)
+    drain()
+    expect(dropped == 1, "throwing probe did not drop the task quietly")
+    expect(state.off_calls == 0,
+        "probe failure turned off WiFi the session never raised")
 end
 
 print(("silent_network_spec: %d checks"):format(checks))
