@@ -25,7 +25,10 @@ function PowerMenu:init()
     end
     Device.canPowerOff = function() return true end
     function Device:powerOff()
-        os.execute("sync && poweroff")
+        -- 走原生关机路径（runlevel 0 → shutdown.conf → 完整关机流程），
+        -- 而不是直接 busybox poweroff：裸 poweroff 会跳过 powerd 的关机准备
+        -- （PMIC/服务收尾），实测导致下次开机需短按两次才启动。
+        os.execute("sync && /sbin/shutdown -h now")
     end
 
     -- UIManager 就绪后再覆盖事件处理器（确保在 generic 注册的空操作之后）
